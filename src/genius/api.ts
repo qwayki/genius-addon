@@ -6,6 +6,30 @@
 // для кастомных origin. Query-параметр — простой GET без preflight, проходит нормально.
 import { log } from '../logger'
 
+// ─── Типы ошибок ──────────────────────────────────────────────────────────
+
+export type FetchError = 'network' | 'unauthorized' | 'rate_limit' | 'server_error' | 'not_found'
+let lastError: FetchError | null = null
+
+export function getLastError(): FetchError | null {
+    return lastError
+}
+
+export function getErrorMessage(error: FetchError): string {
+    switch (error) {
+        case 'network':
+            return 'Нет подключения к интернету'
+        case 'unauthorized':
+            return 'Неверный токен Genius API. Проверьте токен в настройках'
+        case 'rate_limit':
+            return 'Превышен лимит запросов к Genius API. Попробуйте через несколько минут'
+        case 'server_error':
+            return 'Ошибка сервера Genius. Попробуйте позже'
+        case 'not_found':
+            return 'Ничего не найдено'
+    }
+}
+
 const CACHE_KEY = 'genius_info_v3'  // v3: единый ключ вместо одного ключа на запись
 const CACHE_TTL_FOUND = 3 * 24 * 60 * 60 * 1000   // 3 дня — нашли с данными
 const CACHE_TTL_EMPTY = 1 * 24 * 60 * 60 * 1000   // 1 день — нашли но пусто
@@ -36,11 +60,27 @@ async function geniusFetch<T>(token: string, path: string): Promise<T | null> {
         const res = await fetch(url, {
             cache: 'no-store'
         })
-        if (!res.ok) return null
+
+        if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                lastError = 'unauthorized'
+            } else if (res.status === 429) {
+                lastError = 'rate_limit'
+            } else if (res.status >= 500) {
+                lastError = 'server_error'
+            } else {
+                lastError = 'not_found'
+            }
+            log('[genius-info] API error:', res.status)
+            return null
+        }
+
         const json = await res.json()
+        lastError = null
         return json.response as T
     } catch (err) {
         log('[genius-info] API error:', err)
+        lastError = 'network'
         return null
     }
 }
@@ -49,14 +89,23 @@ async function geniusPublicFetch<T>(path: string): Promise<T | null> {
     try {
         const url = `https://genius.com/api${path}`
         const res = await fetch(url, { cache: 'no-store' })
+
         if (!res.ok) {
             log('[genius-info] Public API bad status:', res.status, path)
+            if (res.status >= 500) {
+                lastError = 'server_error'
+            } else {
+                lastError = 'not_found'
+            }
             return null
         }
+
         const json = await res.json()
+        lastError = null
         return json.response as T
     } catch (err) {
         log('[genius-info] Public API error:', err)
+        lastError = 'network'
         return null
     }
 }

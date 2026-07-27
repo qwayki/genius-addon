@@ -1,6 +1,6 @@
 // src/genius/lyrics.ts
 import { log } from '../logger'
-import { fetchLyrics } from './api'
+import { fetchLyrics, getLastError, getErrorMessage } from './api'
 import { createInfoBlock, buildSkeletonBadge, buildSkeletonLines, removeBlock, attachLyricsContextMenu } from './ui'
 import { injectContextMenuStyles } from './styles'
 
@@ -61,7 +61,10 @@ function setEmpty(block: HTMLElement): void {
     body.className = 'genius-info-block__body'
     const p = document.createElement('p')
     p.className = 'genius-info-block__text'
-    p.textContent = 'Текст не найден на Genius'
+
+    const error = getLastError()
+    p.textContent = error ? getErrorMessage(error) : 'Текст не найден на Genius'
+
     body.appendChild(p)
     block.appendChild(body)
 }

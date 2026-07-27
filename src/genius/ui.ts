@@ -1,7 +1,7 @@
 // src/genius/ui.ts
 
 import type { GeniusArtist, GeniusAlbum, TrackInfo } from './api'
-import { normalize } from './api'
+import { normalize, getLastError, getErrorMessage } from './api'
 
 export function removeBlock(id: string) {
     document.getElementById(id)?.remove()
@@ -256,7 +256,10 @@ export function setEmpty(block: HTMLElement) {
     body.innerHTML = ''
     const p = document.createElement('p')
     p.className = 'genius-info-block__text'
-    p.textContent = 'Ничего не найдено ＞︿＜'
+
+    const error = getLastError()
+    p.textContent = error ? getErrorMessage(error) : 'Ничего не найдено ＞︿＜'
+
     body.appendChild(p)
 }
 
