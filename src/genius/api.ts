@@ -118,6 +118,22 @@ const LYRICS_TAG_MAP: Record<string, 'b' | 'i'> = {
     I: 'i', EM: 'i',
 }
 
+// Genius присылает описания в HTML (мы всегда запрашиваем text_format=html,
+// поле plain при этом не приходит). "Пустое" описание Genius обычно кодирует
+// как HTML вроде "<p>?</p>" — сравнивать сырую строку с '?' как раньше уже не работает,
+// поэтому вытаскиваем текстовое содержимое и сравниваем его.
+export function extractGeniusText(html?: string | null): string {
+    if (!html) return ''
+    const div = document.createElement('div')
+    div.innerHTML = html
+    return (div.textContent ?? '').replace(/\u00a0/g, ' ').trim()
+}
+
+export function isGeniusDescriptionEmpty(html?: string | null): boolean {
+    const text = extractGeniusText(html)
+    return !text || text === '?'
+}
+
 function escapeHtml(text: string): string {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -227,7 +243,7 @@ function ck(...parts: string[]): string {
 export interface GeniusArtist {
     id: number
     name: string
-    description: { plain: string } | null
+    description: { plain?: string; html?: string; dom?: { tag: string; children: any[] } } | null
     image_url: string | null
     url: string
 }
@@ -235,7 +251,7 @@ export interface GeniusArtist {
 export interface GeniusAlbum {
     id: number
     name: string
-    description: { plain: string } | null
+    description: { plain?: string; html?: string } | null
     cover_art_url: string | null
     release_date_for_display: string | null
     url: string
@@ -243,6 +259,7 @@ export interface GeniusAlbum {
         annotations?: Array<{
             body?: {
                 plain?: string
+                html?: string
             }
         }>
     }
@@ -276,7 +293,7 @@ export interface GeniusSong {
     id: number
     title: string
     url: string
-    description?: { plain?: string }
+    description?: { plain?: string; html?: string } | null
     song_art_image_url: string | null
     release_date_for_display: string | null
     primary_artist: GeniusArtist
@@ -320,14 +337,13 @@ export async function searchArtist(token: string, artistName: string): Promise<G
         return null
     }
 
-    const artistRes = await geniusFetch<{ artist: GeniusArtist }>(token, `/artists/${artistId}?text_format=plain`)
+    const artistRes = await geniusFetch<{ artist: GeniusArtist }>(token, `/artists/${artistId}?text_format=html`)
     if (!artistRes?.artist) {
         cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
         return null
     }
 
-    const bio = artistRes.artist.description?.plain?.trim()
-    const hasDesc = !!bio && bio !== '?'
+    const hasDesc = !isGeniusDescriptionEmpty(artistRes.artist.description?.html)
     cacheSet(key, { found: true, data: artistRes.artist, timestamp: Date.now(), ttl: hasDesc ? CACHE_TTL_FOUND : CACHE_TTL_EMPTY })
     return artistRes.artist
 }
@@ -380,14 +396,14 @@ export async function searchAlbum(
         return null
     }
 
-    const albumRes = await geniusFetch<{ album: GeniusAlbum }>(token, `/albums/${best.result.id}?text_format=plain`)
+    const albumRes = await geniusFetch<{ album: GeniusAlbum }>(token, `/albums/${best.result.id}?text_format=html`)
     if (!albumRes?.album) {
         cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
         return null
     }
 
-    const annotation = albumRes.album.description_annotation?.annotations?.[0]?.body?.plain?.trim()
-    const hasDesc = !!annotation && annotation !== '?'
+    const annotationHtml = albumRes.album.description_annotation?.annotations?.[0]?.body?.html
+    const hasDesc = !isGeniusDescriptionEmpty(annotationHtml)
     cacheSet(key, { found: true, data: albumRes.album, timestamp: Date.now(), ttl: hasDesc ? CACHE_TTL_FOUND : CACHE_TTL_EMPTY })
     return albumRes.album
 }
@@ -414,12 +430,12 @@ export async function fetchTrackInfo(
         return null
     }
 
-    const desc = song.description?.plain?.trim()
-    const hasDesc = !!desc && desc !== '?'
-    log('Track description length:', desc?.length ?? 0)
+    const descHtml = song.description?.html
+    const hasDesc = !isGeniusDescriptionEmpty(descHtml)
+    log('Track description length:', descHtml?.length ?? 0)
 
     const result: TrackInfo = {
-        description: desc ?? '?',
+        description: hasDesc ? (descHtml as string) : '?',
         url: song.url,
         foundTitle: song.title,
         foundArtist: song.primary_artist.name
@@ -576,9 +592,82 @@ async function _findSongQuery(
     log('pickBestSong chose:', best?.result?.title ?? null, '/', best?.result?.primary_artist?.name ?? null)
     if (!best?.result?.id) return null
 
-    const songRes = await geniusFetch<{ song: GeniusSong }>(token, `/songs/${best.result.id}?text_format=plain`)
+    const songRes = await geniusFetch<{ song: GeniusSong }>(token, `/songs/${best.result.id}?text_format=html`)
     log('song fetched:', songRes?.song?.title ?? null, '→ album:', songRes?.song?.album?.name ?? null)
     return songRes?.song ?? null
+}
+
+// Sanitize HTML from Genius API - allow safe tags and remove dangerous attributes
+export function sanitizeGeniusHtml(html: string): string {
+    const div = document.createElement('div')
+    div.innerHTML = html
+
+    // Allowed tags that Genius uses for formatting
+    const allowedTags = ['P', 'BR', 'A', 'B', 'I', 'STRONG', 'EM', 'IMG', 'BLOCKQUOTE', 'UL', 'OL', 'LI']
+
+    function sanitizeNode(node: Node): Node | null {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node.cloneNode(true)
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return null
+        }
+
+        const el = node as HTMLElement
+
+        if (!allowedTags.includes(el.tagName)) {
+            // For disallowed tags, keep their text content
+            const frag = document.createDocumentFragment()
+            Array.from(el.childNodes).forEach(child => {
+                const sanitized = sanitizeNode(child)
+                if (sanitized) frag.appendChild(sanitized)
+            })
+            return frag
+        }
+
+        const clone = document.createElement(el.tagName.toLowerCase())
+
+        // Copy safe attributes
+        if (el.tagName === 'A' && el.hasAttribute('href')) {
+            const href = el.getAttribute('href')!
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+                clone.setAttribute('href', href)
+                clone.setAttribute('target', '_blank')
+                clone.setAttribute('rel', 'noopener noreferrer')
+            }
+        }
+
+        if (el.tagName === 'IMG' && el.hasAttribute('src')) {
+            let src = el.getAttribute('src')!
+            // protocol-relative URL → force https
+            if (src.startsWith('//')) src = 'https:' + src
+            if (src.startsWith('http://') || src.startsWith('https://')) {
+                clone.setAttribute('src', src)
+                if (el.hasAttribute('alt')) {
+                    clone.setAttribute('alt', el.getAttribute('alt')!)
+                }
+            } else {
+                return null
+            }
+        }
+
+        // Recursively sanitize children
+        Array.from(el.childNodes).forEach(child => {
+            const sanitized = sanitizeNode(child)
+            if (sanitized) clone.appendChild(sanitized)
+        })
+
+        return clone
+    }
+
+    const result = document.createElement('div')
+    Array.from(div.childNodes).forEach(child => {
+        const sanitized = sanitizeNode(child)
+        if (sanitized) result.appendChild(sanitized)
+    })
+
+    return result.innerHTML
 }
 
 export function evictExpired(): void {

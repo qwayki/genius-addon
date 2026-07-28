@@ -89,6 +89,42 @@ export function injectStyles(): void {
     color: rgba(var(--g-base), calc(0.72 * var(--g-k)));
 }
 
+.genius-info-block__text p {
+    margin: 0;
+}
+
+.genius-info-block__text p + p {
+    margin-top: 0.6em;
+}
+
+.genius-info-block__text ul,
+.genius-info-block__text ol {
+    margin: 0.4em 0;
+    padding-left: 1.4em;
+    list-style-position: outside;
+}
+.genius-info-block__text li {
+    margin: 0;
+    padding: 0;
+}
+
+.genius-info-block__text a {
+    color: rgba(var(--g-base), calc(0.55 * var(--g-k)));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.genius-info-block__text a:hover {
+    color: rgba(var(--g-base), calc(0.85 * var(--g-k)));
+}
+
+.genius-info-block__text img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 6px 0;
+}
+
 .genius-info-block__toggle {
     display: inline-flex;
     align-items: center;
@@ -171,7 +207,19 @@ export function injectStyles(): void {
     transition: max-height 0.25s ease;
 }
 
-#genius-info-album .genius-info-block__body > * {
+#genius-info-album .genius-info-block__body > .genius-info-block__text {
+    margin-top: 8px;
+}
+
+#genius-info-album .genius-info-block__body > .genius-info-block__text p {
+    margin: 0;
+}
+
+#genius-info-album .genius-info-block__body > .genius-info-block__text p + p {
+    margin-top: 0.6em;
+}
+
+#genius-info-album .genius-info-block__body > .genius-info-block__found-note {
     margin-top: 8px;
 }
 

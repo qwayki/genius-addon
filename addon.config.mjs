@@ -11,7 +11,12 @@ const addonConfig = {
     libraryLogo: '',
     tags: ['genius', 'biography', 'lyrics', 'annotations'],
     dependencies: [],
-    allowedUrls: ['https://api.genius.com', 'https://genius.com'],
+    allowedUrls: [
+        'https://api.genius.com',
+        'https://genius.com',
+        'https://images.genius.com',
+        'https://filepicker-images.genius.com',
+    ],
     supportedVersions: [],
 }
 

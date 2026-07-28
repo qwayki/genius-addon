@@ -36,4 +36,15 @@ yarn-error.log*
 .cache/
 
 # Optional: todo.txt if you don't want to track it
-# todo.txt
+todo.txt
+
+# Yarn Berry
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+.yarn/install-state.gz
+.pnp.*

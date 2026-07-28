@@ -1,7 +1,7 @@
 // src/genius/ui.ts
 
 import type { GeniusArtist, GeniusAlbum, TrackInfo } from './api'
-import { normalize, getLastError, getErrorMessage } from './api'
+import { normalize, getLastError, getErrorMessage, sanitizeGeniusHtml, isGeniusDescriptionEmpty } from './api'
 
 export function removeBlock(id: string) {
     document.getElementById(id)?.remove()
@@ -88,15 +88,21 @@ export function buildSkeletonLines(count: number, lastLineWidth = '100%'): HTMLE
 
 // ─── Построение body с текстом и кнопкой ─────────────────────────────────
 
-function buildBody(text: string, maxLen: number, collapsible: boolean): HTMLElement {
+function buildBody(text: string, maxLen: number, collapsible: boolean, isHtml = false): HTMLElement {
     const body = document.createElement('div')
     body.className = 'genius-info-block__body'
 
     const truncated = maxLen > 0 && text.length > maxLen + 50
-    const p = document.createElement('p')
-    p.className = 'genius-info-block__text'
-    p.appendChild(linkify(truncated ? text.slice(0, maxLen).trimEnd() + '…' : text))
-    body.appendChild(p)
+    const div = document.createElement('div')
+    div.className = 'genius-info-block__text'
+
+    if (isHtml) {
+        div.innerHTML = truncated ? sanitizeGeniusHtml(text.slice(0, maxLen).trimEnd() + '…') : sanitizeGeniusHtml(text)
+    } else {
+        div.appendChild(linkify(truncated ? text.slice(0, maxLen).trimEnd() + '…' : text))
+    }
+
+    body.appendChild(div)
 
     if (truncated) {
         const btn = document.createElement('button')
@@ -113,16 +119,16 @@ function buildBody(text: string, maxLen: number, collapsible: boolean): HTMLElem
             expanded = !expanded
 
             if (expanded) {
-                p.innerHTML = ''
-                p.appendChild(linkify(text))
+                div.innerHTML = isHtml ? sanitizeGeniusHtml(text) : ''
+                if (!isHtml) div.appendChild(linkify(text))
                 label.textContent = 'Свернуть'
                 const toH = body.scrollHeight
                 animateHeight(body, fromH, toH)
             } else {
                 const anim = animateHeight(body, fromH, collapsedH)
                 anim.onfinish = () => {
-                    p.innerHTML = ''
-                    p.appendChild(linkify(text.slice(0, maxLen).trimEnd() + '…'))
+                    div.innerHTML = isHtml ? sanitizeGeniusHtml(text.slice(0, maxLen).trimEnd() + '…') : ''
+                    if (!isHtml) div.appendChild(linkify(text.slice(0, maxLen).trimEnd() + '…'))
                     label.textContent = 'Показать полностью'
                 }
             }
@@ -148,9 +154,10 @@ interface TextBlockOptions {
     anchor: HTMLElement
     maxLen?: number
     collapsible?: boolean
+    isHtml?: boolean
 }
 
-function renderTextBlock({ id, title, text, url, anchor, maxLen = 0, collapsible = false }: TextBlockOptions): void {
+function renderTextBlock({ id, title, text, url, anchor, maxLen = 0, collapsible = false, isHtml = false }: TextBlockOptions): void {
     let block = document.getElementById(id)
     if (!block) {
         block = createInfoBlock(id, title)
@@ -159,7 +166,7 @@ function renderTextBlock({ id, title, text, url, anchor, maxLen = 0, collapsible
 
     setBadge(block, url)
 
-    const newBody = buildBody(text, maxLen, collapsible)
+    const newBody = buildBody(text, maxLen, collapsible, isHtml)
     const oldBody = block.querySelector('.genius-info-block__body') as HTMLElement | null
 
     if (collapsible) {
@@ -193,17 +200,19 @@ function appendFoundNote(blockId: string, foundName: string, foundSub?: string):
 }
 
 export function renderArtistBio(artist: GeniusArtist, maxLen: number, anchor: HTMLElement, originalArtist: string): void {
-    const raw = artist.description?.plain?.trim()
-    const text = (!raw || raw === '?') ? 'Описание ещё не добавлено' : raw
-    renderTextBlock({ id: 'genius-info-bio', title: 'Биография', text, url: artist.url, anchor, maxLen })
+    const raw = artist.description?.html
+    const empty = isGeniusDescriptionEmpty(raw)
+    const text = empty ? 'Описание ещё не добавлено' : (raw as string)
+    renderTextBlock({ id: 'genius-info-bio', title: 'Биография', text, url: artist.url, anchor, maxLen, isHtml: !empty })
 
     if (normalize(artist.name) !== normalize(originalArtist))
         appendFoundNote('genius-info-bio', artist.name)
 }
 
 export function renderTrackAbout(data: TrackInfo, anchor: HTMLElement, maxLen: number, originalTitle: string, originalArtist: string): void {
-    const desc = data.description === '?' ? 'Описание ещё не добавлено' : data.description
-    renderTextBlock({ id: 'genius-info-track', title: 'О треке', text: desc, url: data.url, anchor, maxLen })
+    const empty = data.description === '?' || isGeniusDescriptionEmpty(data.description)
+    const desc = empty ? 'Описание ещё не добавлено' : data.description
+    renderTextBlock({ id: 'genius-info-track', title: 'О треке', text: desc, url: data.url, anchor, maxLen, isHtml: !empty })
 
     const titleMatch = normalize(data.foundTitle) === normalize(originalTitle)
     const artistMatch = originalArtist
@@ -215,8 +224,10 @@ export function renderTrackAbout(data: TrackInfo, anchor: HTMLElement, maxLen: n
 }
 
 export function renderAlbumDesc(album: GeniusAlbum, anchor: HTMLElement, originalAlbum: string, originalArtist: string): void {
-    const text = album.description_annotation?.annotations?.[0]?.body?.plain?.trim() || 'Описание ещё не добавлено'
-    renderTextBlock({ id: 'genius-info-album', title: 'Об альбоме', text, url: album.url, anchor, collapsible: true })
+    const raw = album.description_annotation?.annotations?.[0]?.body?.html
+    const empty = isGeniusDescriptionEmpty(raw)
+    const text = empty ? 'Описание ещё не добавлено' : (raw as string)
+    renderTextBlock({ id: 'genius-info-album', title: 'Об альбоме', text, url: album.url, anchor, collapsible: true, isHtml: !empty })
     initCollapsible('genius-info-album')
 
     if (normalize(album.name) !== normalize(originalAlbum))
@@ -447,11 +458,24 @@ export function attachLyricsContextMenu(block: HTMLElement, url: string, html: s
 
         const btnRect = btn.getBoundingClientRect()
         const menuW = menu.offsetWidth
+        const menuH = menu.offsetHeight
+
+        // Horizontal positioning
         let left = btnRect.right - menuW
         if (left < 8) left = 8
         if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8
+
+        // Vertical positioning
+        let top = btnRect.bottom + 6
+        if (top + menuH > window.innerHeight - 8) {
+            // Not enough space below, try above
+            top = btnRect.top - menuH - 6
+            // If still not enough space above, align to bottom of viewport
+            if (top < 8) top = window.innerHeight - menuH - 8
+        }
+
         menu.style.position = 'fixed'
-        menu.style.top = `${btnRect.bottom + 6}px`
+        menu.style.top = `${top}px`
         menu.style.left = `${left}px`
         menu.style.zIndex = '9999'
 
