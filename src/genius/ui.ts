@@ -359,37 +359,54 @@ export function attachLyricsContextMenu(block: HTMLElement, url: string, html: s
     }
 
     const onOutsideClick = (e: MouseEvent) => {
-        if (menu && !menu.contains(e.target as Node) && e.target !== btn) closeMenu()
+        if (menu && !menu.contains(e.target as Node) && !btn.contains(e.target as Node)) {
+            closeMenu()
+        }
     }
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation()
-        if (menu) { closeMenu(); return }
 
+        if (menu) {
+            closeMenu()
+            return
+        }
+
+        // Wrapper как у ЯМ (верхний уровень)
         menu = document.createElement('div')
-        menu.className = 'genius-menu'
+        menu.className = 'genius-menu__wrapper'
         menu.setAttribute('role', 'menu')
-
-        // анимация появления
+        menu.setAttribute('tabindex', '0')
         menu.style.opacity = '0'
         menu.style.transition = 'opacity 0.15s ease'
 
         // ─── Открыть в Genius ───
-        const itemGenius = document.createElement('a')
+        const itemGenius = document.createElement('button')
         itemGenius.className = 'genius-menu__item'
-        itemGenius.href = url
-        itemGenius.target = '_blank'
-        itemGenius.rel = 'noopener noreferrer'
-        itemGenius.style.textDecoration = 'none'
+        itemGenius.setAttribute('type', 'button')
         itemGenius.setAttribute('role', 'menuitem')
-        itemGenius.innerHTML = `${ymIcon('link_xxs')}Открыть в Genius`
-        itemGenius.addEventListener('click', closeMenu)
+        itemGenius.setAttribute('tabindex', '-1')
+
+        const geniusContent = document.createElement('span')
+        geniusContent.className = 'genius-menu__item-content'
+        geniusContent.innerHTML = `${ymIcon('link_xxs')}Открыть в Genius`
+        itemGenius.appendChild(geniusContent)
+        itemGenius.addEventListener('click', () => {
+            window.open(url, '_blank', 'noopener,noreferrer')
+            closeMenu()
+        })
 
         // ─── Скопировать текст ───
         const itemCopy = document.createElement('button')
         itemCopy.className = 'genius-menu__item'
+        itemCopy.setAttribute('type', 'button')
         itemCopy.setAttribute('role', 'menuitem')
-        itemCopy.innerHTML = `${ymIcon('lyrics_xxs')}Скопировать текст`
+        itemCopy.setAttribute('tabindex', '-1')
+
+        const copyContent = document.createElement('span')
+        copyContent.className = 'genius-menu__item-content'
+        copyContent.innerHTML = `${ymIcon('lyrics_xxs')}Скопировать текст`
+        itemCopy.appendChild(copyContent)
         itemCopy.addEventListener('click', () => {
             const tmp = document.createElement('div')
             tmp.innerHTML = html
@@ -397,19 +414,20 @@ export function attachLyricsContextMenu(block: HTMLElement, url: string, html: s
             closeMenu()
         })
 
-        // ─── Разделитель ───
-        const divider = document.createElement('hr')
-        divider.className = 'genius-menu__divider'
-
         // ─── Toggle-пункты (WIP, disabled) ───
         const toggleLabels = ['Отображать аннотации', 'Отображать артистов', 'Отображать теги']
         const toggleEls = toggleLabels.map(label => {
             const item = document.createElement('button')
             item.className = 'genius-menu__item'
+            item.setAttribute('type', 'button')
             item.setAttribute('role', 'menuitemcheckbox')
             item.setAttribute('aria-checked', 'false')
+            item.setAttribute('tabindex', '-1')
             item.disabled = true
-            item.innerHTML = `
+
+            const content = document.createElement('span')
+            content.className = 'genius-menu__item-content'
+            content.innerHTML = `
                 <span style="flex:1;text-align:left;">${label}</span>
                 <span class="genius-menu__toggle" aria-hidden="true">
                     <svg width="32" height="18" viewBox="0 0 32 18" style="display:block;opacity:0.25">
@@ -417,25 +435,26 @@ export function attachLyricsContextMenu(block: HTMLElement, url: string, html: s
                         <circle cx="9" cy="9" r="5" fill="currentColor"/>
                     </svg>
                 </span>`
+            item.appendChild(content)
             return item
         })
 
         menu.appendChild(itemGenius)
         menu.appendChild(itemCopy)
-        menu.appendChild(divider)
-        toggleEls.forEach(el => menu!.appendChild(el))
+        toggleEls.forEach(el => menu.appendChild(el))
 
         document.body.appendChild(menu)
+
         const btnRect = btn.getBoundingClientRect()
         const menuW = menu.offsetWidth
-        let left = btnRect.left
+        let left = btnRect.right - menuW
+        if (left < 8) left = 8
         if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8
         menu.style.position = 'fixed'
         menu.style.top = `${btnRect.bottom + 6}px`
         menu.style.left = `${left}px`
         menu.style.zIndex = '9999'
 
-        // запускаем анимацию появления в следующем кадре
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 if (!menu) return

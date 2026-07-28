@@ -210,15 +210,16 @@ export function injectStyles(): void {
     document.head.appendChild(style)
 }
 
-// Контекстное меню для блока "Текст" — 1-в-1 повторяет VibeContextMenu ЯМ
-// (стили сняты с их же computed styles, а не подобраны на глаз)
+// Контекстное меню для блока "Текст" — структура как у ЯМ
+// для совместимости со стилями других аддонов
 export function injectContextMenuStyles(): void {
     const MENU_STYLE_ID = 'genius-info-context-menu-styles'
     if (document.getElementById(MENU_STYLE_ID)) return
     const style = document.createElement('style')
     style.id = MENU_STYLE_ID
     style.textContent = `
-.genius-menu {
+/* Wrapper внутри [role="menu"] */
+.genius-menu__wrapper {
     backdrop-filter: blur(0.875rem);
     background-color: var(--ym-background-color-primary-enabled-menu, rgba(0,0,0,0.7));
     border: none;
@@ -230,7 +231,7 @@ export function injectContextMenuStyles(): void {
     width: 17.1875rem;
     overflow: auto;
 }
- 
+
 .genius-menu__item {
     box-sizing: border-box;
     margin: 0;
@@ -245,7 +246,7 @@ export function injectContextMenuStyles(): void {
     display: flex;
     align-items: center;
     outline: 0;
-    padding: var(--ym-spacer-size-xs, 0.5rem) var(--ym-spacer-size-xl, 1.25rem);
+    padding: var(--ym-spacer-size-xs, 0.5rem) var(--ym-spacer-size-s, 0.625rem);
     width: 100%;
     font-family: var(--ym-font-text, inherit);
     font-size: var(--ym-font-size-label-m, 0.875rem);
@@ -253,13 +254,19 @@ export function injectContextMenuStyles(): void {
     line-height: var(--ym-font-line-height-label-m, 1.25rem);
     transition: background-color 0.15s, color 0.15s;
 }
- 
+
+.genius-menu__item-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
 .genius-menu__item:hover,
 .genius-menu__item.is-active {
     background-color: var(--ym-surface-color-primary-enabled-list, hsla(0,0%,100%,0.08));
     color: var(--ym-controls-color-primary-text-enabled_variant, #e6e6e6);
 }
- 
+
 .genius-menu__item-icon {
     height: var(--ym-icon-size-xxs, 1.25rem);
     width: var(--ym-icon-size-xxs, 1.25rem);
@@ -268,14 +275,14 @@ export function injectContextMenuStyles(): void {
     fill: currentColor;
     color: var(--ym-controls-color-primary-text-enabled_variant, #e6e6e6);
 }
- 
+
 .genius-menu__divider {
     background-color: var(--ym-surface-color-primary-enabled-list, hsla(0,0%,100%,0.08));
     height: 0.0625rem;
     margin: var(--ym-spacer-size-xxs, 0.375rem) var(--ym-spacer-size-s, 0.625rem);
     border: none;
 }
- 
+
 .genius-menu__toggle {
     margin-left: auto;
     flex-shrink: 0;
