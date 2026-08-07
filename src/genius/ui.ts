@@ -88,16 +88,73 @@ export function buildSkeletonLines(count: number, lastLineWidth = '100%'): HTMLE
 
 // ─── Построение body с текстом и кнопкой ─────────────────────────────────
 
+function truncateHtml(html: string, maxLen: number): string {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = html
+    const plainText = tmp.innerText || tmp.textContent || ''
+
+    if (plainText.length <= maxLen) return html
+
+    let charCount = 0
+    const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT, null)
+    let cutNode: Text | null = null
+    let cutOffset = 0
+
+    while (walker.nextNode()) {
+        const node = walker.currentNode as Text
+        const nodeLen = node.textContent?.length || 0
+
+        if (charCount + nodeLen >= maxLen) {
+            cutNode = node
+            cutOffset = maxLen - charCount
+            break
+        }
+        charCount += nodeLen
+    }
+
+    if (!cutNode) return html
+
+    cutNode.textContent = (cutNode.textContent?.slice(0, cutOffset).trimEnd() || '') + '…'
+
+    let sibling = cutNode.nextSibling
+    while (sibling) {
+        const toRemove = sibling
+        sibling = sibling.nextSibling
+        toRemove.remove()
+    }
+
+    let parent = cutNode.parentElement
+    while (parent && parent !== tmp) {
+        sibling = parent.nextSibling
+        while (sibling) {
+            const toRemove = sibling
+            sibling = sibling.nextSibling
+            toRemove.remove()
+        }
+        parent = parent.parentElement
+    }
+
+    return tmp.innerHTML
+}
+
 function buildBody(text: string, maxLen: number, collapsible: boolean, isHtml = false): HTMLElement {
     const body = document.createElement('div')
     body.className = 'genius-info-block__body'
 
-    const truncated = maxLen > 0 && text.length > maxLen + 50
+    let plainTextLength = text.length
+    if (isHtml) {
+        const tmp = document.createElement('div')
+        tmp.innerHTML = text
+        plainTextLength = (tmp.innerText || tmp.textContent || '').length
+    }
+
+    const truncated = maxLen > 0 && plainTextLength > maxLen + 50
     const div = document.createElement('div')
     div.className = 'genius-info-block__text'
 
     if (isHtml) {
-        div.innerHTML = truncated ? sanitizeGeniusHtml(text.slice(0, maxLen).trimEnd() + '…') : sanitizeGeniusHtml(text)
+        const displayText = truncated ? truncateHtml(text, maxLen) : text
+        div.innerHTML = sanitizeGeniusHtml(displayText)
     } else {
         div.appendChild(linkify(truncated ? text.slice(0, maxLen).trimEnd() + '…' : text))
     }
@@ -127,8 +184,12 @@ function buildBody(text: string, maxLen: number, collapsible: boolean, isHtml = 
             } else {
                 const anim = animateHeight(body, fromH, collapsedH)
                 anim.onfinish = () => {
-                    div.innerHTML = isHtml ? sanitizeGeniusHtml(text.slice(0, maxLen).trimEnd() + '…') : ''
-                    if (!isHtml) div.appendChild(linkify(text.slice(0, maxLen).trimEnd() + '…'))
+                    if (isHtml) {
+                        div.innerHTML = sanitizeGeniusHtml(truncateHtml(text, maxLen))
+                    } else {
+                        div.innerHTML = ''
+                        div.appendChild(linkify(text.slice(0, maxLen).trimEnd() + '…'))
+                    }
                     label.textContent = 'Показать полностью'
                 }
             }
