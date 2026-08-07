@@ -119,7 +119,7 @@ export function injectStyles(): void {
 
 .genius-info-block__text img {
     display: block;
-    max-width: 100%;
+    max-width: min(400px, 100%);
     height: auto;
     border-radius: 6px;
     margin: 6px 0;
