@@ -19,7 +19,6 @@
                 {
                     "id": "lyricsSource",
                     "name": "Источник текста",
-                    "description": "Откуда брать текст песни.",
                     "type": "selector",
                     "defaultParameter": 2,
                     "selected": 2,
@@ -46,7 +45,6 @@
                 {
                     "id": "showArtistBio",
                     "name": "Показывать биографию",
-                    "description": "Добавляет блок с биографией артиста на страницу исполнителя.",
                     "type": "button",
                     "bool": true,
                     "defaultParameter": true
@@ -54,7 +52,7 @@
                 {
                     "id": "bioMaxLength",
                     "name": "Макс. длина биографии (символов)",
-                    "description": "0 = показывать полностью.",
+                    "description": "0 = показывать полностью",
                     "type": "slider",
                     "min": 0,
                     "max": 2000,
@@ -70,7 +68,6 @@
                 {
                     "id": "showTrackInfo",
                     "name": "Показывать описание трека",
-                    "description": "Добавляет блок с описанием трека в модалку трека.",
                     "type": "button",
                     "bool": true,
                     "defaultParameter": true
@@ -78,7 +75,7 @@
                 {
                     "id": "trackMaxLength",
                     "name": "Макс. длина описания трека (символов)",
-                    "description": "0 = показывать полностью.",
+                    "description": "0 = показывать полностью",
                     "type": "slider",
                     "min": 0,
                     "max": 2000,
@@ -94,7 +91,6 @@
                 {
                     "id": "showAlbumDesc",
                     "name": "Показывать описание альбома",
-                    "description": "Добавляет блок с описанием альбома на страницу альбома.",
                     "type": "button",
                     "bool": true,
                     "defaultParameter": true
@@ -107,7 +103,7 @@
                 {
                     "id": "devMode",
                     "name": "Режим разработчика",
-                    "description": "Включает логи в консоли и кнопку очистки кэша.",
+                    "description": "Включает логи в консоли",
                     "type": "button",
                     "bool": false,
                     "defaultParameter": false
