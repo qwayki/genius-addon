@@ -19,7 +19,7 @@ async function rebuild() {
         mkdirSync(outDir, { recursive: true })
         cpSync(resolve(root, 'addon'), outDir, { recursive: true })
 
-        const metadata = { ...addonConfig, script: 'script.iife.js', style: 'script.css' }
+        const metadata = { ...addonConfig, script: 'script.iife.js', css: 'script.css' }
         writeFileSync(resolve(outDir, 'metadata.json'), JSON.stringify(metadata, null, 2), 'utf-8')
 
         console.log(`[genius-info] ✓ Ready → ${outDir}`)

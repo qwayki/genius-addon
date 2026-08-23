@@ -12,9 +12,9 @@ export function injectStyles(): void {
  * Переключение по классам темы ЯМ (.ym-dark-theme / .ym-light-theme)
  * --g-base: rgb-канал (без alpha) базового цвета темы
  */
+@layer genius-info-base {
 :root, .ym-dark-theme {
     --g-base: 255,255,255;
-    --g-k: 1;
 }
 .ym-light-theme {
     --g-base: 0,0,0;
@@ -23,13 +23,13 @@ export function injectStyles(): void {
 .genius-info-block {
     padding: 12px 14px;
     border-radius: 10px;
-    background: rgba(var(--g-base), calc(0.03 * var(--g-k)));
-    border: 1px solid rgba(var(--g-base), calc(0.06 * var(--g-k)));
+    background: rgba(var(--g-base), 0.03);
+    border: 1px solid rgba(var(--g-base), 0.06);
     transition: border-color 0.2s;
 }
 
 .genius-info-block:hover {
-    border-color: rgba(var(--g-base), calc(0.09 * var(--g-k)));
+    border-color: rgba(var(--g-base), 0.09);
 }
 
 .genius-info-block__header {
@@ -45,21 +45,21 @@ export function injectStyles(): void {
     font-size: 15px;
     font-weight: 600;
     line-height: 1.2;
-    color: rgba(var(--g-base), calc(0.9 * var(--g-k)));
+    color: rgba(var(--g-base), 0.9);
     letter-spacing: -0.01em;
 }
 
 .genius-info-block__badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     padding: 0;
     border-radius: 0;
     font-size: 11.5px;
     font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
-    color: rgba(var(--g-base), calc(0.4 * var(--g-k)));
+    color: rgba(var(--g-base), 0.4);
     background: transparent;
     text-decoration: none;
     transition: color 0.15s;
@@ -68,7 +68,7 @@ export function injectStyles(): void {
 }
 
 .genius-info-block__badge:hover {
-    color: rgba(var(--g-base), calc(0.75 * var(--g-k)));
+    color: rgba(var(--g-base), 0.75);
 }
 
 .genius-info-block__badge img {
@@ -86,7 +86,7 @@ export function injectStyles(): void {
     margin: 0;
     font-size: 13.5px;
     line-height: 1.6;
-    color: rgba(var(--g-base), calc(0.72 * var(--g-k)));
+    color: rgba(var(--g-base), 0.72);
 }
 
 .genius-info-block__text p {
@@ -99,22 +99,23 @@ export function injectStyles(): void {
 
 .genius-info-block__text ul,
 .genius-info-block__text ol {
-    margin: 0.4em 0;
-    padding-left: 1.4em;
-    list-style-position: outside;
+    margin: 0.4em 0 !important;
+    padding-left: 1.4em !important;
+    list-style-position: outside !important;
 }
+    
 .genius-info-block__text li {
     margin: 0;
     padding: 0;
 }
 
 .genius-info-block__text a {
-    color: rgba(var(--g-base), calc(0.55 * var(--g-k)));
+    color: rgba(var(--g-base), 0.55);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 .genius-info-block__text a:hover {
-    color: rgba(var(--g-base), calc(0.85 * var(--g-k)));
+    color: rgba(var(--g-base), 0.85);
 }
 
 .genius-info-block__text img {
@@ -128,7 +129,7 @@ export function injectStyles(): void {
 .genius-info-block__toggle {
     display: inline-flex;
     align-items: center;
-    margin-top: 7px;
+    margin-top: 7px !important;
     gap: 4px;
     align-self: flex-start;
     padding: 0;
@@ -138,40 +139,35 @@ export function injectStyles(): void {
     font-family: inherit;
     font-size: 12.5px;
     font-weight: 500;
-    color: rgba(var(--g-base), calc(0.38 * var(--g-k)));
+    color: rgba(var(--g-base), 0.38);
     transition: color 0.15s;
 }
 
 .genius-info-block__toggle:hover {
-    color: rgba(var(--g-base), calc(0.65 * var(--g-k)));
+    color: rgba(var(--g-base), 0.65);
+}
+
+.genius-skeleton div,
+.genius-skeleton-badge {
+    background: linear-gradient(90deg,
+        rgba(var(--g-base), 0.04),
+        rgba(var(--g-base), 0.09),
+        rgba(var(--g-base), 0.04)
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
 }
 
 .genius-skeleton div {
     height: 11px;
     margin: 7px 0;
     border-radius: 6px;
-    background: linear-gradient(
-        90deg,
-        rgba(var(--g-base), calc(0.04 * var(--g-k))),
-        rgba(var(--g-base), calc(0.09 * var(--g-k))),
-        rgba(var(--g-base), calc(0.04 * var(--g-k)))
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
 }
 
 .genius-skeleton-badge {
     height: 14px;
     width: 110px;
     border-radius: 6px;
-    background: linear-gradient(
-        90deg,
-        rgba(var(--g-base), calc(0.04 * var(--g-k))),
-        rgba(var(--g-base), calc(0.09 * var(--g-k))),
-        rgba(var(--g-base), calc(0.04 * var(--g-k)))
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
 }
 
 @keyframes shimmer {
@@ -193,18 +189,25 @@ export function injectStyles(): void {
 }
 
 #genius-info-album {
-    margin: 4px 8px 4px 24px;
-    padding: 9px 14px;
+    margin: -12px 0px 6px 16px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+#genius-info-album:hover,
+#genius-info-album.is-expanded {
+    background: rgba(var(--g-base), 0.03);
+    border-color: rgba(var(--g-base), 0.06);
 }
 
 #genius-info-album .genius-info-block__header {
     cursor: pointer;
     user-select: none;
     margin-bottom: 0;
-}
-
-#genius-info-album .genius-info-block__body {
-    transition: max-height 0.25s ease;
+    opacity: 0.9;
 }
 
 #genius-info-album .genius-info-block__body > .genius-info-block__text {
@@ -224,7 +227,7 @@ export function injectStyles(): void {
 }
 
 #genius-info-album .genius-info-block__header:hover {
-    opacity: 0.85;
+    opacity: 1;
 }
 
 .genius-info-block__arrow {
@@ -239,20 +242,21 @@ export function injectStyles(): void {
 .genius-info-block__found-note {
     margin: 8px 0 0;
     padding: 6px 0 0;
-    border-top: 1px solid rgba(var(--g-base), calc(0.05 * var(--g-k)));
+    border-top: 1px solid rgba(var(--g-base), 0.05);
     font-size: 12px;
     line-height: 1.4;
-    color: rgba(var(--g-base), calc(0.28 * var(--g-k)));
+    color: rgba(var(--g-base), 0.28);
     font-style: italic;
 }
 
 .genius-info-block__link {
-    color: rgba(var(--g-base), calc(0.55 * var(--g-k)));
+    color: rgba(var(--g-base), 0.55);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 .genius-info-block__link:hover {
-    color: rgba(var(--g-base), calc(0.85 * var(--g-k)));
+    color: rgba(var(--g-base), 0.85);
+}
 }
 `
     document.head.appendChild(style)
@@ -267,6 +271,7 @@ export function injectContextMenuStyles(): void {
     style.id = MENU_STYLE_ID
     style.textContent = `
 /* Wrapper внутри [role="menu"] */
+@layer genius-info-base {
 .genius-menu__wrapper {
     backdrop-filter: blur(0.875rem);
     background-color: var(--ym-background-color-primary-enabled-menu, rgba(0,0,0,0.7));
@@ -321,7 +326,6 @@ export function injectContextMenuStyles(): void {
     margin-inline-end: var(--ym-spacer-size-s, 0.625rem);
     flex-shrink: 0;
     fill: currentColor;
-    color: var(--ym-controls-color-primary-text-enabled_variant, #e6e6e6);
 }
 
 .genius-menu__divider {
@@ -349,13 +353,14 @@ export function injectContextMenuStyles(): void {
     font-weight: 700;
     letter-spacing: 1px;
     line-height: 1;
-    color: rgba(var(--g-base), calc(0.3 * var(--g-k)));
+    color: rgba(var(--g-base), 0.3);
     transition: color 0.15s;
     flex-shrink: 0;
 }
 
 .genius-info-block__menu-btn:hover {
-    color: rgba(var(--g-base), calc(0.65 * var(--g-k)));
+    color: rgba(var(--g-base), 0.65);
+}
 }
 `
     document.head.appendChild(style)
@@ -369,9 +374,9 @@ export function injectLyricsStyles(): void {
     const style = document.createElement('style')
     style.id = LYRICS_STYLE_ID
     style.textContent = `
-
+@layer genius-info-base {
 .genius-info-lyrics {
-    margin: 12px;
+    margin: 12px 24px 12px 24px;
 }
 
 .genius-info-lyrics .genius-info-block__header {
@@ -383,9 +388,10 @@ export function injectLyricsStyles(): void {
     font-family: inherit;
     font-size: 13.5px;
     line-height: 1.7;
-    color: rgba(var(--g-base), calc(0.72 * var(--g-k)));
+    color: rgba(var(--g-base), 0.72);
     white-space: pre-wrap;
     word-break: break-word;
+}
 }
 `
     document.head.appendChild(style)

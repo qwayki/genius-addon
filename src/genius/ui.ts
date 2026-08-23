@@ -396,6 +396,7 @@ export function initCollapsible(blockId: string): void {
         })
 
         arrow.style.transform = collapsed ? 'rotate(0deg)' : 'rotate(90deg)'
+        block.classList.toggle('is-expanded', !collapsed)
     }
     badge?.addEventListener('click', e => e.stopPropagation())
 }
