@@ -202,3 +202,8 @@ export async function handleLyrics(
         showYam(trackPage)
     }
 }
+
+// возвращаем ЯМ-блок текста, если мы его прятали (режим «Всегда Genius»); нужен при выключении аддона
+export function restoreYamLyrics(): void {
+    document.querySelectorAll<HTMLElement>(LYRICS_SELECTOR).forEach(el => { el.style.display = '' })
+}

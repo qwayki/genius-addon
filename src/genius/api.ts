@@ -71,7 +71,7 @@ async function geniusFetch<T>(token: string, path: string): Promise<T | null> {
             } else {
                 lastError = 'not_found'
             }
-            log('[genius-info] API error:', res.status)
+            log('API error:', res.status)
             return null
         }
 
@@ -79,7 +79,7 @@ async function geniusFetch<T>(token: string, path: string): Promise<T | null> {
         lastError = null
         return json.response as T
     } catch (err) {
-        log('[genius-info] API error:', err)
+        log('API error:', err)
         lastError = 'network'
         return null
     }
@@ -91,7 +91,7 @@ async function geniusPublicFetch<T>(path: string): Promise<T | null> {
         const res = await fetch(url, { cache: 'no-store' })
 
         if (!res.ok) {
-            log('[genius-info] Public API bad status:', res.status, path)
+            log('Public API bad status:', res.status, path)
             if (res.status >= 500) {
                 lastError = 'server_error'
             } else {
@@ -104,7 +104,7 @@ async function geniusPublicFetch<T>(path: string): Promise<T | null> {
         lastError = null
         return json.response as T
     } catch (err) {
-        log('[genius-info] Public API error:', err)
+        log('Public API error:', err)
         lastError = 'network'
         return null
     }
@@ -204,7 +204,7 @@ export async function fetchLyrics(url: string): Promise<string | null> {
         const result = parts.join('\n\n').trim()
         return result || null
     } catch (err) {
-        log('[genius-info] Lyrics fetch error:', err)
+        log('Lyrics fetch error:', err)
         return null
     }
 }

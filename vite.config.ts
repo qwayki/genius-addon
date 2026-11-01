@@ -1,29 +1,15 @@
+import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
+import { addonPlugin, defineAddonManifest } from '@pulsesync/addon-sdk/vite'
 import addonConfig from './addon.config.mjs'
+import { settings } from './src/settings.ts'
 
 export default defineConfig({
     resolve: {
         alias: {
-            '@': resolve(__dirname, 'src'),
+            '@': resolve(import.meta.dirname, 'src'),
         },
     },
-    build: {
-        outDir: `dist/${addonConfig.directoryName}`,
-        lib: {
-            entry: resolve(__dirname, 'src/main.ts'),
-            name: addonConfig.id.replace(/-/g, '_'),
-            fileName: 'script',
-            formats: ['iife'],
-        },
-        rollupOptions: {
-            output: {
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name?.endsWith('.css')) return 'script.css'
-                    return assetInfo.name ?? 'asset'
-                },
-            },
-        },
-        minify: false,
-    },
+    plugins: [react(), addonPlugin({ manifest: defineAddonManifest(addonConfig), settings })],
 })

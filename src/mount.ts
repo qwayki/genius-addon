@@ -1,35 +1,23 @@
 // src/mount.ts
-// @ts-ignore
-import addonConfig from '../addon.config.mjs'
-import { readBooleanSetting, readStringSetting, readNumberSetting } from './pulsesync'
+import type { AddonApi } from '@pulsesync/addon-sdk'
+import { settings } from './settings'
 import { searchArtist, fetchTrackInfo, searchAlbum } from './genius/api'
 import { renderArtistBio, renderTrackAbout, removeBlock, renderLoading, setEmpty, renderAlbumDesc, renderNoToken } from './genius/ui'
-import { handleLyrics, removeLyricsBlock, type LyricsSource } from './genius/lyrics'
+import { handleLyrics, removeLyricsBlock, restoreYamLyrics, type LyricsSource } from './genius/lyrics'
 import { log } from './logger'
 
-function getSettings() {
-    return window.pulsesyncApi?.getSettings(addonConfig.name).getCurrent() ?? {}
+// Запускает check при каждой мутации DOM (и один раз сразу — вдруг нужная страница уже открыта)
+function watchDom(api: AddonApi, check: () => void): void {
+    const observer = new MutationObserver(check)
+    observer.observe(document.body, { childList: true, subtree: true })
+    api.onCleanup(() => observer.disconnect())
+    check()
 }
 
-function getToken(): string {
-    return readStringSetting(getSettings(), 'geniusToken', '')
-}
+// ─── Биография артиста ───────────────────────────────────────────────────
 
-function getLyricsSource(): LyricsSource {
-    const settings = getSettings()
-    const val = readStringSetting(settings, 'lyricsSource', '2')
-    const map: Record<string, LyricsSource> = {
-        '1': 'yandex',
-        '2': 'fallback',
-        '3': 'genius',
-    }
-    return map[val] ?? 'fallback'
-}
-
-// ─── Observer: биография артиста ─────────────────────────────────────────
-
-function mountArtistObserver(): MutationObserver {
-    const observer = new MutationObserver(() => {
+function mountArtistObserver(api: AddonApi): void {
+    watchDom(api, () => {
         const modal = document.querySelector('[data-test-id="ARTIST_ABOUT_MODAL"]') as HTMLElement | null
         if (!modal) return
 
@@ -40,20 +28,19 @@ function mountArtistObserver(): MutationObserver {
         if (modal.dataset.geniusInjected) return
         modal.dataset.geniusInjected = 'true'
 
-        const settings = getSettings()
-        if (!readBooleanSetting(settings, 'showArtistBio', true)) return
+        if (!settings.store.showArtistBio) return
 
-        const token = getToken()
+        const token = settings.store.geniusToken
         if (!token) {
             renderNoToken(header as HTMLElement, 'genius-info-bio', 'Биография')
             return
         }
 
         const artistName = titleEl.textContent?.trim() ?? ''
-        const maxLen = readNumberSetting(settings, 'bioMaxLength', 600)
+        const maxLen = settings.store.bioMaxLength
 
         const block = renderLoading(header as HTMLElement, 'genius-info-bio', 'Биография')
-    
+
         log('Searching artist:', artistName)
         searchArtist(token, artistName).then(artist => {
             log('Artist result:', artist?.name ?? null)
@@ -64,15 +51,12 @@ function mountArtistObserver(): MutationObserver {
             renderArtistBio(artist, maxLen, header as HTMLElement, artistName)
         })
     })
-
-    observer.observe(document.body, { childList: true, subtree: true })
-    return observer
 }
 
-// ─── Observer: трек (описание + текст) ───────────────────────────────────
+// ─── Трек (описание + текст) ─────────────────────────────────────────────
 
-function mountTrackObserver(): MutationObserver {
-    const observer = new MutationObserver(() => {
+function mountTrackObserver(api: AddonApi): void {
+    watchDom(api, () => {
         const trackPage = document.querySelector('[data-test-id="TRACK_PAGE"]') as HTMLElement | null
         if (!trackPage) return
 
@@ -88,8 +72,6 @@ function mountTrackObserver(): MutationObserver {
 
         if (!titleEl || !artistName) return
 
-        const settings = getSettings()
-
         const titleClone = titleEl?.cloneNode(true) as HTMLElement
         titleClone?.querySelector('[data-test-id="ENTITY_VERSION"]')?.remove()
         const trackTitle = titleClone?.textContent?.trim() ?? ''
@@ -101,16 +83,15 @@ function mountTrackObserver(): MutationObserver {
         removeLyricsBlock()
 
         const anchor = entityHeader
-        const token = getToken()
-        const lyricsSource = getLyricsSource()
+        const token = settings.store.geniusToken
+        const lyricsSource = settings.store.lyricsSource as LyricsSource
 
         // ─── Описание трека + текст ─────────────────────────────────────
-        const showTrackInfo = readBooleanSetting(settings, 'showTrackInfo', true)
+        const showTrackInfo = settings.store.showTrackInfo
         const wantsLyrics = lyricsSource !== 'yandex'
 
         // fetchTrackInfo нужен для обоих блоков (у текста источник URL — найденный трек),
-        // раньше при showTrackInfo+wantsLyrics он всё равно вызывался только один раз,
-        // но структура была продублирована на два одинаковых блока — свели в один запрос
+        // поэтому запрос один на оба
         const trackInfoPromise = token && (showTrackInfo || wantsLyrics)
             ? fetchTrackInfo(token, trackTitle, artistName)
             : null
@@ -123,7 +104,7 @@ function mountTrackObserver(): MutationObserver {
                 removeBlock('genius-info-track')
                 removeBlock('genius-info-empty')
                 const block = renderLoading(anchor, 'genius-info-track', 'О треке')
-                const maxLen = readNumberSetting(settings, 'trackMaxLength', 600)
+                const maxLen = settings.store.trackMaxLength
 
                 trackInfoPromise!.then(data => {
                     if (!data) { setEmpty(block); return }
@@ -138,15 +119,12 @@ function mountTrackObserver(): MutationObserver {
             handleLyrics(trackPage, lyricsSource, trackInfoPromise.then(data => data?.url ?? null))
         }
     })
-
-    observer.observe(document.body, { childList: true, subtree: true })
-    return observer
 }
 
-// ─── Observer: альбом ─────────────────────────────────────────────────────
+// ─── Альбом ──────────────────────────────────────────────────────────────
 
-function mountAlbumObserver(): MutationObserver {
-    const observer = new MutationObserver(() => {
+function mountAlbumObserver(api: AddonApi): void {
+    watchDom(api, () => {
         const albumPage = document.querySelector('[data-test-id="ALBUM_PAGE"]') as HTMLElement | null
         if (!albumPage) return
         const entityHeader = albumPage.querySelector('[data-test-id="ENTITY_HEADER"]') as HTMLElement | null
@@ -164,9 +142,8 @@ function mountAlbumObserver(): MutationObserver {
         if (albumPage.dataset.geniusKey === currentKey) return
         albumPage.dataset.geniusKey = currentKey
 
-        const settings = getSettings()
-        if (!readBooleanSetting(settings, 'showAlbumDesc', true)) return
-        const token = getToken()
+        if (!settings.store.showAlbumDesc) return
+        const token = settings.store.geniusToken
         if (!token) {
             renderNoToken(entityHeader, 'genius-info-album', 'Об альбоме', true)
             return
@@ -181,18 +158,26 @@ function mountAlbumObserver(): MutationObserver {
             renderAlbumDesc(album, entityHeader, albumTitle, artistName)
         })
     })
-    observer.observe(document.body, { childList: true, subtree: true })
-    return observer
 }
 
-// ─── Точка входа ──────────────────────────────────────────────────────────
+// ─── Точка входа и уборка ────────────────────────────────────────────────
 
-export function mount(): void {
-    const observers = [
-        mountArtistObserver(),
-        mountTrackObserver(),
-        mountAlbumObserver()
-    ]
-    window.addEventListener('pagehide', () => observers.forEach(o => o.disconnect()))
+export function mount(api: AddonApi): void {
+    mountArtistObserver(api)
+    mountTrackObserver(api)
+    mountAlbumObserver(api)
     log('Mounted')
+}
+
+// Убирает всё, что аддон добавил в страницу: блоки, стили, меню и служебные data-флаги
+// (без флагов после повторного включения блоки не отрисовались бы заново)
+export function cleanupInjected(): void {
+    removeLyricsBlock()
+    restoreYamLyrics()
+    document.querySelectorAll('[id^="genius-info-"]').forEach(el => el.remove())
+    document.querySelectorAll('.genius-menu__wrapper').forEach(el => el.remove())
+    document.querySelectorAll<HTMLElement>('[data-genius-injected], [data-genius-key]').forEach(el => {
+        delete el.dataset.geniusInjected
+        delete el.dataset.geniusKey
+    })
 }
