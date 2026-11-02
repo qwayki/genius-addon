@@ -97,6 +97,40 @@ export function injectStyles(): void {
     margin-top: 0.6em;
 }
 
+/* Цитаты из аннотаций — как на Genius: большая кавычка слева, курсив.
+   !important на отступах: глобальные стили ЯМ (не в layer) иначе перебивают наши */
+.genius-info-block__text blockquote {
+    position: relative;
+    margin: 0.8em 0 !important;
+    padding: 0 0 0 28px !important;
+    font-style: italic;
+}
+
+.genius-info-block__text blockquote::before {
+    content: "\\201C";
+    position: absolute;
+    left: 2px;
+    top: -3.6px;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 36px;
+    letter-spacing: 0.112px;
+    color: rgb(var(--g-base));
+    opacity: 0.75;
+    quotes: none;
+    pointer-events: none;
+    user-select: none;
+}
+
+.genius-info-block__text blockquote p {
+    margin: 0;
+}
+
+.genius-info-block__text blockquote p + p {
+    margin-top: 0.4em;
+}
+
 .genius-info-block__text ul,
 .genius-info-block__text ol {
     margin: 0.4em 0 !important;
