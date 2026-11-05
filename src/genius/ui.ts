@@ -487,34 +487,8 @@ export function attachLyricsContextMenu(block: HTMLElement, url: string, html: s
             closeMenu()
         })
 
-        // ─── Toggle-пункты (WIP, disabled) ───
-        const toggleLabels = ['Отображать аннотации', 'Отображать артистов', 'Отображать теги']
-        const toggleEls = toggleLabels.map(label => {
-            const item = document.createElement('button')
-            item.className = 'genius-menu__item'
-            item.setAttribute('type', 'button')
-            item.setAttribute('role', 'menuitemcheckbox')
-            item.setAttribute('aria-checked', 'false')
-            item.setAttribute('tabindex', '-1')
-            item.disabled = true
-
-            const content = document.createElement('span')
-            content.className = 'genius-menu__item-content'
-            content.innerHTML = `
-                <span style="flex:1;text-align:left;">${label}</span>
-                <span class="genius-menu__toggle" aria-hidden="true">
-                    <svg width="32" height="18" viewBox="0 0 32 18" style="display:block;opacity:0.25">
-                        <rect x="1" y="1" width="30" height="16" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                        <circle cx="9" cy="9" r="5" fill="currentColor"/>
-                    </svg>
-                </span>`
-            item.appendChild(content)
-            return item
-        })
-
         menu.appendChild(itemGenius)
         menu.appendChild(itemCopy)
-        toggleEls.forEach(el => menu.appendChild(el))
 
         document.body.appendChild(menu)
 
