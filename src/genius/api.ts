@@ -8,7 +8,7 @@ import { log } from '../logger'
 
 // ─── Типы ошибок ──────────────────────────────────────────────────────────
 
-export type FetchError = 'network' | 'unauthorized' | 'rate_limit' | 'server_error' | 'not_found'
+export type FetchError = 'network' | 'unauthorized' | 'rate_limit' | 'server_error' | 'not_found' | 'blocked'
 let lastError: FetchError | null = null
 
 export function getLastError(): FetchError | null {
@@ -27,6 +27,8 @@ export function getErrorMessage(error: FetchError): string {
             return 'Ошибка сервера Genius. Попробуйте позже'
         case 'not_found':
             return 'Ничего не найдено'
+        case 'blocked':
+            return 'Genius временно блокирует запросы текста. Попробуйте позже'
     }
 }
 
@@ -183,17 +185,54 @@ function normalizeLyricsWhitespace(html: string): string {
         .trim()
 }
 
+// Genius иногда отдаёт антибот-страницу («make sure you're a human») с 403 вместо текста.
+// После первого такого ответа не долбим сайт несколько минут и не ретраим.
+const BLOCK_COOLDOWN = 5 * 60 * 1000
+let blockedUntil = 0
+const lyricsCache = new Map<string, string>()
+
+const LYRICS_HEADERS = {
+    'accept': 'text/html,application/xhtml+xml',
+    'accept-language': 'ru,en;q=0.8',
+}
+
 // Возвращает HTML-строку (только текст + <b>/<i>), готовую для innerHTML —
 // весь текстовый контент экранирован в escapeHtml, теги добавляем только сами,
 // так что инъекция извне невозможна.
 export async function fetchLyrics(url: string): Promise<string | null> {
+    const cached = lyricsCache.get(url)
+    if (cached) return cached
+
+    if (Date.now() < blockedUntil) {
+        log('Lyrics: cooldown, пропускаем запрос')
+        lastError = 'blocked'
+        return null
+    }
+
     try {
-        const res = await fetch(url, { cache: 'no-store' })
-        if (!res.ok) return null
+        const res = await fetch(url, { cache: 'no-store', headers: LYRICS_HEADERS })
+        if (!res.ok) {
+            log('Lyrics fetch status:', res.status, url)
+            if (res.status === 403 || res.status === 429) {
+                blockedUntil = Date.now() + BLOCK_COOLDOWN
+                lastError = 'blocked'
+            } else if (res.status >= 500) {
+                lastError = 'server_error'
+            } else {
+                lastError = 'not_found'
+            }
+            return null
+        }
         const html = await res.text()
+        if (/make sure you.?re a human/i.test(html)) {
+            log('Lyrics: антибот-страница Genius')
+            blockedUntil = Date.now() + BLOCK_COOLDOWN
+            lastError = 'blocked'
+            return null
+        }
         const doc = new DOMParser().parseFromString(html, 'text/html')
         const containers = doc.querySelectorAll('[data-lyrics-container="true"]')
-        if (!containers.length) return null
+        if (!containers.length) { lastError = 'not_found'; return null }
 
         const parts: string[] = []
         containers.forEach(el => {
@@ -202,9 +241,13 @@ export async function fetchLyrics(url: string): Promise<string | null> {
         })
 
         const result = parts.join('\n\n').trim()
-        return result || null
+        if (!result) return null
+        lastError = null
+        lyricsCache.set(url, result)
+        return result
     } catch (err) {
         log('Lyrics fetch error:', err)
+        lastError = 'network'
         return null
     }
 }
