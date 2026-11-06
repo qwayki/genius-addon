@@ -3,7 +3,7 @@ const addonConfig = {
     directoryName: 'genius-info',
     name: 'Genius Info',
     description: 'Добавляет биографии артистов, описания альбомов и аннотации к текстам из Genius.',
-    version: '0.2.1',
+    version: '0.2.2',
     author: 'qwayki',
     image: 'logo.jpg',
     banner: 'banner.jpg',

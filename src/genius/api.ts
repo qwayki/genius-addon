@@ -87,14 +87,32 @@ async function geniusFetch<T>(token: string, path: string): Promise<T | null> {
     }
 }
 
+// genius.com/api без заголовков в изолированном окружении отдаёт 403 (как и страницы текстов),
+// поэтому шлём accept/accept-language. Если всё равно режут — не долбим сайт 5 минут.
+const PUBLIC_HEADERS = {
+    'accept': 'application/json, text/plain, */*',
+    'accept-language': 'ru,en;q=0.8',
+}
+const PUBLIC_BLOCK_COOLDOWN = 5 * 60 * 1000
+let publicBlockedUntil = 0
+
 async function geniusPublicFetch<T>(path: string): Promise<T | null> {
+    if (Date.now() < publicBlockedUntil) {
+        log('Public API: cooldown, пропускаем запрос', path)
+        lastError = 'blocked'
+        return null
+    }
+
     try {
         const url = `https://genius.com/api${path}`
-        const res = await fetch(url, { cache: 'no-store' })
+        const res = await fetch(url, { cache: 'no-store', headers: PUBLIC_HEADERS })
 
         if (!res.ok) {
             log('Public API bad status:', res.status, path)
-            if (res.status >= 500) {
+            if (res.status === 403 || res.status === 429) {
+                publicBlockedUntil = Date.now() + PUBLIC_BLOCK_COOLDOWN
+                lastError = 'blocked'
+            } else if (res.status >= 500) {
                 lastError = 'server_error'
             } else {
                 lastError = 'not_found'
@@ -277,6 +295,13 @@ function cacheSet<T>(key: string, entry: CacheEntry<T>): void {
     } catch { /* переполнен */ }
 }
 
+// Промах кешируем только если Genius реально ответил «нет такого». Если запрос упал
+// (403, сеть, лимит, 5xx, токен) — не запоминаем, иначе «не найдено» зависнет на 12 часов.
+function cacheMiss(key: string): void {
+    if (lastError !== null && lastError !== 'not_found') return
+    cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+}
+
 function ck(...parts: string[]): string {
     return parts.join('_').toLowerCase().replace(/[^a-zа-я0-9_]/gi, '_').slice(0, 80)
 }
@@ -376,13 +401,13 @@ export async function searchArtist(token: string, artistName: string): Promise<G
     }
 
     if (!artistId) {
-        cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+        cacheMiss(key)
         return null
     }
 
     const artistRes = await geniusFetch<{ artist: GeniusArtist }>(token, `/artists/${artistId}?text_format=html`)
     if (!artistRes?.artist) {
-        cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+        cacheMiss(key)
         return null
     }
 
@@ -395,6 +420,7 @@ export async function searchAlbum(
     token: string,
     albumTitle: string,
     artistName: string,
+    trackTitles: string[] = [],
 ): Promise<GeniusAlbum | null> {
     const key = ck('album', artistName, albumTitle)
     const cached = cacheGet<GeniusAlbum>(key)
@@ -417,6 +443,18 @@ export async function searchAlbum(
         log(`searchAlbum attempt 2 (title only): ${hits.length} hits`)
     }
 
+    // публичный API режет запросы — достаём альбом через официальный API по трекам, которые видны на странице альбома
+    if (!hits.length && lastError === 'blocked') {
+        const viaSongs = await findAlbumViaTracks(token, trackTitles, primaryArtist, albumTitleNorm, artistNorm)
+        if (viaSongs) {
+            const hasDescVia = !isGeniusDescriptionEmpty(viaSongs.description_annotation?.annotations?.[0]?.body?.html)
+            cacheSet(key, { found: true, data: viaSongs, timestamp: Date.now(), ttl: hasDescVia ? CACHE_TTL_FOUND : CACHE_TTL_EMPTY })
+            return viaSongs
+        }
+        cacheMiss(key)
+        return null
+    }
+
     const filtered = hits.filter(h => {
         const name = h.result.name.toLowerCase()
         return !name.includes('translation') && !name.includes('romanized') && !name.includes('перевод')
@@ -435,13 +473,13 @@ export async function searchAlbum(
     log('searchAlbum: best=', best ? `${best.result.name} / ${best.result.primary_artist_names}` : null)
 
     if (!best) {
-        cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+        cacheMiss(key)
         return null
     }
 
     const albumRes = await geniusFetch<{ album: GeniusAlbum }>(token, `/albums/${best.result.id}?text_format=html`)
     if (!albumRes?.album) {
-        cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+        cacheMiss(key)
         return null
     }
 
@@ -449,6 +487,41 @@ export async function searchAlbum(
     const hasDesc = !isGeniusDescriptionEmpty(annotationHtml)
     cacheSet(key, { found: true, data: albumRes.album, timestamp: Date.now(), ttl: hasDesc ? CACHE_TTL_FOUND : CACHE_TTL_EMPTY })
     return albumRes.album
+}
+
+// Фолбэк для searchAlbum: берём реальные треки со страницы альбома (они точно с него),
+// ищем каждый на Genius и смотрим song.album. Трек мог быть выпущен синглом и висеть на другом
+// альбоме Genius, поэтому название альбома сверяем и при несовпадении идём к следующему треку.
+async function findAlbumViaTracks(
+    token: string,
+    trackTitles: string[],
+    primaryArtist: string,
+    albumTitleNorm: string,
+    artistNorm: string,
+): Promise<GeniusAlbum | null> {
+    for (const trackTitle of trackTitles) {
+        const res = await geniusFetch<{
+            hits: Array<{ type: string; result: { id: number; title?: string; primary_artist?: { name: string } } }>
+        }>(token, `/search?q=${encodeURIComponent(`${trackTitle} ${primaryArtist}`)}`)
+        if (lastError === 'blocked' || lastError === 'unauthorized') return null
+
+        const trackNorm = normalize(trackTitle)
+        const hit = (res?.hits ?? []).find(h =>
+            h.type === 'song' &&
+            normalize(h.result.title ?? '') === trackNorm &&
+            (!artistNorm || normalize(h.result.primary_artist?.name ?? '').includes(artistNorm))
+        )
+        log(`findAlbumViaTracks: "${trackTitle}" → ${hit ? 'song ' + hit.result.id : 'нет совпадения'}`)
+        if (!hit) continue
+
+        const songRes = await geniusFetch<{ song: GeniusSong }>(token, `/songs/${hit.result.id}`)
+        const album = songRes?.song?.album
+        if (!album || normalize(album.name) !== albumTitleNorm) continue
+
+        const albumRes = await geniusFetch<{ album: GeniusAlbum }>(token, `/albums/${album.id}?text_format=html`)
+        if (albumRes?.album) return albumRes.album
+    }
+    return null
 }
 
 async function fetchAlbumHits(query: string): Promise<GeniusAlbumHit[]> {
@@ -469,7 +542,7 @@ export async function fetchTrackInfo(
 
     const song = await findSong(token, title, artist)
     if (!song) {
-        cacheSet(key, { found: false, timestamp: Date.now(), ttl: CACHE_TTL_MISS })
+        cacheMiss(key)
         return null
     }
 

@@ -153,7 +153,13 @@ function mountAlbumObserver(api: AddonApi): void {
         removeBlock('genius-info-album')
         const block = renderLoading(entityHeader, 'genius-info-album', 'Об альбоме', true)
 
-        searchAlbum(token, albumTitle, artistName).then(album => {
+        // реальные треки со страницы — для фолбэка, когда публичный поиск альбомов недоступен
+        const trackTitles = Array.from(albumPage.querySelectorAll('[data-test-id="TRACK_ALBUM"]'))
+            .map(row => row.querySelector('[data-test-id="TRACK_TITLE"]')?.textContent?.trim() ?? '')
+            .filter(Boolean)
+            .slice(0, 4)
+
+        searchAlbum(token, albumTitle, artistName, trackTitles).then(album => {
             if (!album) { setEmpty(block); return }
             renderAlbumDesc(album, entityHeader, albumTitle, artistName)
         })
