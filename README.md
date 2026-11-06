@@ -53,7 +53,7 @@ yarn build:sync  # финальная сборка
 | Страница трека | Показывать описание трека | вкл/выкл блок описания |
 | Страница трека | Макс. длина описания трека | обрезка текста, 0 = без обрезки |
 | Страница альбома | Показывать описание альбома | вкл/выкл блок описания |
-| Разработка | Режим разработчика | логи в консоли + доп. отладка |
+| Разработка | Режим разработчика | логи в консоли |
 
 ---
 
@@ -69,21 +69,24 @@ yarn build:sync  # финальная сборка
 
 ```
 src/
-  main.ts          точка входа: инициализация стилей, mount(), dev-режим
+  main.tsx         точка входа: defineAddon, инициализация стилей, mount(), cleanup
+  settings.ts      схема настроек аддона (defineAddonSettings)
   mount.ts         observer-ы для страниц ЯМ (артист / трек / альбом)
-  pulsesync.ts     хелперы над window.pulsesyncApi (чтение настроек)
-  logger.ts        условный console.log под флагом dev-режима
-  global.d.ts      типы window.pulsesyncApi для TS
+  logger.ts        условный console.log под флагом режима разработчика
   genius/
-    api.ts         Genius API + кеш (Node.js https, без CORS)
+    api.ts         клиент Genius API (fetch) + кеш в localStorage
     ui.ts          рендер блоков/скелетонов в DOM
     styles.ts      инжект CSS в страницу
     lyrics.ts      логика источника текста песни (ЯМ / Genius / fallback)
 addon/
-  handleEvents.json  схема настроек, которую показывает PulseSync
-  README.md          описание аддона для стора PulseSync (не для разработки)
+  README.md        описание аддона для стора PulseSync (не для разработки)
+  logo.jpg         иконка аддона
+  banner.jpg       баннер аддона
 scripts/
-  dev-build.mjs    watch-сборка → папка аддонов PulseSync
-  post-build.mjs   финальная сборка → dist/
-  sync-addon.mjs   копирование dist → папка аддонов
+  dev-build.mjs        watch-сборка → папка аддонов PulseSync
+  post-build.mjs       копирует addon/ в dist/ после сборки
+  sync-addon.mjs       копирование dist → папка аддонов
+  pulsesync-paths.mjs  поиск папки аддонов PulseSync (Windows / macOS / Linux)
+addon.config.mjs   метаданные аддона (id, версия, разрешённые URL)
+vite.config.ts     сборка через плагин @pulsesync/addon-sdk
 ```
